@@ -1,0 +1,31 @@
+{
+  "name": "scubaanywhere",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser-based SCuBA assessment for Microsoft 365 and Google Workspace. OAuth in, ephemeral report out.",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "workspaces": [
+    "packages/core",
+    "web",
+    "relay"
+  ],
+  "scripts": {
+    "vendor": "node tools/vendor-upstream.mjs",
+    "policies": "node tools/build-policies.mjs",
+    "baselines": "node tools/build-baselines.mjs",
+    "setup": "npm run vendor && npm run policies && npm run baselines",
+    "build": "npm run build -w @scubaanywhere/core && npm run build -w @scubaanywhere/relay && npm run build -w @scubaanywhere/web",
+    "test": "npm run test -w @scubaanywhere/core && npm run test -w @scubaanywhere/relay",
+    "e2e": "npm run e2e -w @scubaanywhere/web",
+    "verify-parity": "node tools/verify-parity.mjs",
+    "dev": "npm run dev -w @scubaanywhere/web",
+    "relay": "npm run start -w @scubaanywhere/relay"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
+  }
+}

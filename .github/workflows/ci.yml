@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Fetches CISA's sources at the commits pinned in tools/upstream.json,
+      # downloads a checksum-verified OPA binary, and compiles the Rego.
+      - name: Fetch upstream and build the policy bundles
+        run: npm run setup
+
+      - run: npm run build
+
+      - run: npm test
+
+      # Evaluates CISA's sample export with the OPA binary and with the
+      # WebAssembly bundle, and diffs every policy result.
+      - name: Verify the browser engine matches the OPA binary
+        run: npm run verify-parity
+
+      - name: Install Chromium for the end-to-end tests
+        run: npx playwright install --with-deps chromium
+        working-directory: web
+
+      - run: npm run e2e
+
+      - name: Upload the Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: web/playwright-report/
+          retention-days: 7

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCuBAAnywhere</title>
+    <!--
+      Serve the same policy as a response header in production; a meta tag cannot
+      express frame-ancestors. connect-src is the load-bearing line: it is what
+      stops collected configuration being sent anywhere other than the admin APIs
+      it came from. Add your relay's origin to it when you deploy one.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none';
+               script-src 'self' 'wasm-unsafe-eval';
+               style-src 'self';
+               img-src 'self' data:;
+               font-src 'self';
+               connect-src 'self' https://graph.microsoft.com https://graph.microsoft.us https://dod-graph.microsoft.us https://login.microsoftonline.com https://login.microsoftonline.us;
+               form-action 'none';
+               base-uri 'none';
+               object-src 'none'"
+    />
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>SCuBAAnywhere</h1>
+        <p class="tagline">
+          CISA's SCuBA baselines, run in your browser. Sign in, collect, read the report, wipe the session.
+        </p>
+      </div>
+      <div class="header-right">
+        <div id="status"></div>
+        <button type="button" id="wipe" class="danger">Wipe session</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="card">
+        <h2>Assess a Microsoft 365 tenant</h2>
+        <p>
+          You are signed in as yourself, with your own read-only admin rights. Tokens stay in this tab's memory,
+          the configuration is evaluated here, and nothing is stored on a server.
+        </p>
+        <div id="products" class="products"></div>
+        <div class="actions">
+          <button type="button" id="sign-in">Sign in with Microsoft</button>
+          <button type="button" id="run" class="primary">Collect and assess</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Evaluate a settings export you already have</h2>
+        <p>
+          Point this at a <code>ProviderSettingsExport.json</code> from ScubaGear or the equivalent from
+          ScubaGoggles. The file is read in the page and is not uploaded.
+        </p>
+        <input type="file" id="settings-file" accept="application/json,.json" />
+      </section>
+
+      <section id="results" class="card results"></section>
+
+      <section class="card">
+        <h2>Run log</h2>
+        <div id="log" class="log"></div>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        SCuBAAnywhere is not a CISA project. It runs the Rego policies and baselines published by
+        <a href="https://github.com/cisagov/ScubaGear">cisagov/ScubaGear</a> and
+        <a href="https://github.com/cisagov/ScubaGoggles">cisagov/ScubaGoggles</a>, unchanged.
+      </p>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

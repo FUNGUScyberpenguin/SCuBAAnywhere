@@ -1,0 +1,27 @@
+{
+  "scubagear": {
+    "repo": "https://github.com/cisagov/ScubaGear",
+    "ref": "main",
+    "commit": "e06238f35860ccecaaec2dd5eeb7fc8742452bd4",
+    "note": "Pinned past v1.8.0 for schemas/ScubaBaselines.json and schemas/ScubaGearApiCatalog.json, which the tagged release does not ship.",
+    "paths": {
+      "rego": "PowerShell/ScubaGear/Rego",
+      "baselines": "PowerShell/ScubaGear/schemas/ScubaBaselines.json",
+      "apiCatalog": "PowerShell/ScubaGear/schemas/ScubaGearApiCatalog.json",
+      "sampleExport": "PowerShell/ScubaGear/Sample-Reports/ProviderSettingsExport.json"
+    }
+  },
+  "scubagoggles": {
+    "repo": "https://github.com/cisagov/ScubaGoggles",
+    "ref": "v1.0.1",
+    "commit": "8370434288a1a9c114ffbddf57182ba8d990fb1a",
+    "paths": {
+      "rego": "scubagoggles/rego",
+      "baselines": "scubagoggles/baselines"
+    }
+  },
+  "opa": {
+    "version": "v1.9.0",
+    "downloadBase": "https://github.com/open-policy-agent/opa/releases/download"
+  }
+}

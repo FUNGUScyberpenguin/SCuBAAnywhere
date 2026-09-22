@@ -1,0 +1,21 @@
+{
+  "name": "@scubaanywhere/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@azure/msal-browser": "^5.22.0",
+    "@scubaanywhere/core": "*"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.14"
+  }
+}

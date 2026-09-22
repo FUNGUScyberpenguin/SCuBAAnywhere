@@ -1,0 +1,9 @@
+{
+  "v1.9.0": {
+    "linux-x64": { "asset": "opa_linux_amd64_static", "sha256": "66fa66f3b730b2fb086003863428b382b2898d343adb4b5dfab5598b4d739eed" },
+    "linux-arm64": { "asset": "opa_linux_arm64_static", "sha256": "e7fdc5f823d5156cd449d6242b97b237cacbcbe4f531743d695c8d413d9aebb3" },
+    "darwin-x64": { "asset": "opa_darwin_amd64", "sha256": "1122d0176604cd055d8f88b2b4d4019c469891d37e0bce9c1306e001e656ad2e" },
+    "darwin-arm64": { "asset": "opa_darwin_arm64_static", "sha256": "0134337a52bd255a2202eac4b4b85348fd4a77f94e8dab8ebcb2399ec018f4c0" },
+    "win32-x64": { "asset": "opa_windows_amd64.exe", "sha256": "ea07eb413f7d0b258dc2e45d054ebb7df6fad42ad436bbe96e5dc6d5e7bc2951" }
+  }
+}

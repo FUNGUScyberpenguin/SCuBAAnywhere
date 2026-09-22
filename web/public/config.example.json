@@ -1,0 +1,13 @@
+{
+  "$comment": "Copy to config.json and fill in for your deployment. Served as a static file, so it must not contain secrets. The app is a public OAuth client and has no client secret.",
+  "microsoft": {
+    "clientId": "00000000-0000-0000-0000-000000000000",
+    "authority": "https://login.microsoftonline.com/organizations",
+    "environment": "commercial"
+  },
+  "relayUrl": "",
+  "dns": {
+    "enabled": false,
+    "resolverUrl": "https://cloudflare-dns.com/dns-query"
+  }
+}

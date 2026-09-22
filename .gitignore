@@ -1,0 +1,21 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Vendored upstream sources and anything derived from them. Fetched by
+# `npm run vendor`, never committed: the CISA repos are the source of truth.
+vendor/
+web/public/policies/
+tools/bin/
+
+# Assessment output must never end up in version control.
+*.scuba.json
+*.scuba.html
+.env
+.env.*
+!.env.example
+
+# Playwright
+web/test-results/
+web/playwright-report/
+web/public/baselines/
