@@ -1,8 +1,10 @@
 # The relay
 
 The relay exists for one reason: Microsoft's admin APIs for Exchange Online, the Security Suite,
-SharePoint, Teams and Power Platform do not send CORS headers, so a browser cannot call them. Graph
-does, so **Entra ID needs no relay**. If the Entra baseline is all you want, skip this page.
+SharePoint, Teams and Power Platform do not send CORS headers, so a browser cannot call them.
+
+Graph does, so **Entra ID needs no relay**, and Google's APIs do too, so **no part of Google
+Workspace needs one either**. If that covers what you want to assess, skip this page.
 
 ## What it does and does not do
 

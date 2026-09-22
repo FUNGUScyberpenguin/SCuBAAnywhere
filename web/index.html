@@ -8,7 +8,12 @@
       Serve the same policy as a response header in production; a meta tag cannot
       express frame-ancestors. connect-src is the load-bearing line: it is what
       stops collected configuration being sent anywhere other than the admin APIs
-      it came from. Add your relay's origin to it when you deploy one.
+      it came from. Add your relay's origin to it when you deploy one, and your
+      DNS-over-HTTPS resolver if you turn the DNS checks on.
+
+      There is no third-party script here, which is why Google sign-in talks to
+      the authorization endpoint directly rather than loading Google Identity
+      Services.
     -->
     <meta
       http-equiv="Content-Security-Policy"
@@ -17,7 +22,11 @@
                style-src 'self';
                img-src 'self' data:;
                font-src 'self';
-               connect-src 'self' https://graph.microsoft.com https://graph.microsoft.us https://dod-graph.microsoft.us https://login.microsoftonline.com https://login.microsoftonline.us;
+               connect-src 'self'
+                 https://graph.microsoft.com https://graph.microsoft.us https://dod-graph.microsoft.us
+                 https://login.microsoftonline.com https://login.microsoftonline.us
+                 https://admin.googleapis.com https://cloudidentity.googleapis.com
+                 https://oauth2.googleapis.com;
                form-action 'none';
                base-uri 'none';
                object-src 'none'"
@@ -46,10 +55,24 @@
           You are signed in as yourself, with your own read-only admin rights. Tokens stay in this tab's memory,
           the configuration is evaluated here, and nothing is stored on a server.
         </p>
-        <div id="products" class="products"></div>
+        <div id="m365-products" class="products"></div>
         <div class="actions">
-          <button type="button" id="sign-in">Sign in with Microsoft</button>
-          <button type="button" id="run" class="primary">Collect and assess</button>
+          <button type="button" id="m365-sign-in">Sign in with Microsoft</button>
+          <button type="button" id="m365-run" class="primary">Collect and assess</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Assess a Google Workspace organisation</h2>
+        <p>
+          Google's admin APIs accept browser requests, so every call goes straight from this tab. No relay is
+          involved and the configuration never touches another machine. The access token lasts about an hour
+          and there is no refresh token.
+        </p>
+        <div id="gws-products" class="products"></div>
+        <div class="actions">
+          <button type="button" id="gws-sign-in">Sign in with Google</button>
+          <button type="button" id="gws-run" class="primary">Collect and assess</button>
         </div>
       </section>
 

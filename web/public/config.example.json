@@ -1,9 +1,13 @@
 {
-  "$comment": "Copy to config.json and fill in for your deployment. Served as a static file, so it must not contain secrets. The app is a public OAuth client and has no client secret.",
+  "$comment": "Copy to config.json and fill in for your deployment. Served as a static file, so it must not contain secrets. Both OAuth clients are public clients and hold no secret.",
   "microsoft": {
     "clientId": "00000000-0000-0000-0000-000000000000",
     "authority": "https://login.microsoftonline.com/organizations",
     "environment": "commercial"
+  },
+  "google": {
+    "clientId": "000000000000-xxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com",
+    "customerId": "my_customer"
   },
   "relayUrl": "",
   "dns": {

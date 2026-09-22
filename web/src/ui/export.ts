@@ -1,5 +1,5 @@
 import { PRODUCT_LABELS, actionPlan, totals, type Assessment, type AssessedPolicy } from "@scubaanywhere/core";
-import { escapeHtml } from "./dom.js";
+import { escapeHtml, plainText } from "./dom.js";
 
 /**
  * Saving a report.
@@ -36,7 +36,7 @@ export function toCsv(assessment: Assessment): string {
     PRODUCT_LABELS[policy.product] ?? policy.product,
     policy.verdict,
     policy.criticality,
-    policy.baseline?.name ?? "",
+    plainText(policy.baseline?.name ?? ""),
     stripTags(policy.details),
   ]);
   return [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n") + "\r\n";
@@ -115,7 +115,7 @@ function policyTable(policies: AssessedPolicy[]): string {
   <td class="v-${escapeHtml(policy.verdict)}">${escapeHtml(policy.verdict)}</td>
   <td>${escapeHtml(policy.criticality)}</td>
   <td>
-    ${escapeHtml(policy.baseline?.name ?? "")}
+    ${escapeHtml(plainText(policy.baseline?.name ?? ""))}
     <div class="meta">${escapeHtml(stripTags(policy.details))}</div>
     ${remediation(policy)}
   </td>

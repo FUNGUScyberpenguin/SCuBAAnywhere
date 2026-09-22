@@ -1,13 +1,15 @@
-import { M365_PRODUCTS, PRODUCT_LABELS, type M365Product } from "@scubaanywhere/core";
+import { GWS_PRODUCTS, M365_PRODUCTS, PRODUCT_LABELS, type GwsProduct, type M365Product } from "@scubaanywhere/core";
 import { loadConfig, type AppConfig } from "./config.js";
 import { MicrosoftAuth } from "./auth/microsoft.js";
+import { GoogleAuth, completeGoogleRedirect } from "./auth/google.js";
 import { Session, blockPersistentStorage, warnBeforeLosingData } from "./session.js";
-import { evaluateSettings, runMicrosoft365 } from "./run.js";
+import { evaluateSettings, runGoogleWorkspace, runMicrosoft365 } from "./run.js";
 import { clear, el } from "./ui/dom.js";
 import { renderReport } from "./ui/report-view.js";
 
 const session = new Session();
-let auth: MicrosoftAuth | null = null;
+let microsoft: MicrosoftAuth | null = null;
+let google: GoogleAuth | null = null;
 let config: AppConfig;
 
 const view = <T extends HTMLElement>(id: string): T => {
@@ -17,13 +19,18 @@ const view = <T extends HTMLElement>(id: string): T => {
 };
 
 async function main(): Promise<void> {
+  // When this page is the OAuth redirect target it is running inside the popup
+  // and has one job: hand the token back and close.
+  if (completeGoogleRedirect()) return;
+
   blockPersistentStorage();
   warnBeforeLosingData(session);
   config = await loadConfig();
 
-  renderProductPicker();
+  renderProductPickers();
   wireSettingsUpload();
-  wireSignIn();
+  wireMicrosoft();
+  wireGoogle();
   wireWipe();
 
   session.subscribe(renderStatus);
@@ -35,72 +42,131 @@ async function main(): Promise<void> {
   });
 
   if (!config.microsoft.clientId) {
-    note("warn", "No Microsoft client id is configured, so live collection is off. You can still evaluate a settings export below.");
+    note("warn", "No Microsoft client id is configured, so live Microsoft 365 collection is off.");
+  }
+  if (!config.google.clientId) {
+    note("warn", "No Google client id is configured, so live Google Workspace collection is off.");
   }
   if (!config.relayUrl) {
-    note("info", "No relay is configured. Entra ID can be collected straight from the browser; the other products need one.");
+    note("info", "No relay is configured. Entra ID and all of Google Workspace work without one; the other Microsoft products need it.");
   }
 }
 
-function renderProductPicker(): void {
-  const container = view("products");
-  clear(container);
+function renderProductPickers(): void {
+  const microsoftProducts = view("m365-products");
+  clear(microsoftProducts);
   for (const product of M365_PRODUCTS) {
     // Defender and the Security Suite share one collector and one set of
     // endpoints; offering both would run the same calls twice.
     if (product === "defender") continue;
-    const id = `product-${product}`;
-    container.append(
-      el(
-        "label",
-        { class: "product-choice", for: id },
-        el("input", {
-          type: "checkbox",
-          id,
-          value: product,
-          ...(product === "aad" ? { checked: true } : {}),
-        }),
-        el("span", {}, PRODUCT_LABELS[product]),
-        product === "aad"
-          ? el("span", { class: "badge" }, "no relay needed")
-          : el("span", { class: "badge badge-relay" }, "needs relay"),
-      ),
+    microsoftProducts.append(
+      choice(`m365-${product}`, product, PRODUCT_LABELS[product], product === "aad", {
+        label: product === "aad" ? "no relay needed" : "needs relay",
+        relay: product !== "aad",
+      }),
     );
+  }
+
+  const googleProducts = view("gws-products");
+  clear(googleProducts);
+  for (const product of GWS_PRODUCTS) {
+    googleProducts.append(choice(`gws-${product}`, product, PRODUCT_LABELS[product], true));
   }
 }
 
-const selectedProducts = (): M365Product[] =>
-  [...view("products").querySelectorAll<HTMLInputElement>("input:checked")].map((input) => input.value as M365Product);
+function choice(
+  id: string,
+  value: string,
+  label: string,
+  checked: boolean,
+  badge?: { label: string; relay: boolean },
+): HTMLElement {
+  return el(
+    "label",
+    { class: "product-choice", for: id },
+    el("input", { type: "checkbox", id, value, ...(checked ? { checked: true } : {}) }),
+    el("span", {}, label),
+    badge ? el("span", { class: badge.relay ? "badge badge-relay" : "badge" }, badge.label) : null,
+  );
+}
 
-function wireSignIn(): void {
-  view<HTMLButtonElement>("sign-in").addEventListener("click", async () => {
+const selected = <T extends string>(containerId: string): T[] =>
+  [...view(containerId).querySelectorAll<HTMLInputElement>("input:checked")].map((input) => input.value as T);
+
+function wireMicrosoft(): void {
+  view<HTMLButtonElement>("m365-sign-in").addEventListener("click", async () => {
     try {
-      auth ??= await MicrosoftAuth.create(config);
-      await auth.signIn();
-      session.update({ signedInAs: auth.signedInAs ?? undefined });
-      session.log("info", `Signed in as ${auth.signedInAs}`);
+      microsoft ??= await MicrosoftAuth.create(config);
+      await microsoft.signIn();
+      session.update({ signedInAs: microsoft.signedInAs ?? undefined });
+      session.log("info", `Signed in to Microsoft 365 as ${microsoft.signedInAs}`);
     } catch (error) {
-      fail("Sign-in failed", error);
+      fail("Microsoft sign-in failed", error);
     }
   });
 
-  view<HTMLButtonElement>("run").addEventListener("click", async () => {
-    const products = selectedProducts();
-    if (products.length === 0) return note("warn", "Choose at least one product first.");
-    if (!auth?.signedInAs) return note("warn", "Sign in before collecting.");
+  view<HTMLButtonElement>("m365-run").addEventListener("click", async () => {
+    const products = selected<M365Product>("m365-products");
+    if (products.length === 0) return note("warn", "Choose at least one Microsoft 365 product first.");
+    if (!microsoft?.signedInAs) return note("warn", "Sign in to Microsoft 365 before collecting.");
 
-    const button = view<HTMLButtonElement>("run");
-    button.disabled = true;
-    try {
-      const assessment = await runMicrosoft365({ config, auth, session, products });
+    await withButton("m365-run", async () => {
+      const assessment = await runMicrosoft365({ config, auth: microsoft!, session, products });
       session.update({ assessment });
       session.log("info", `Done: ${assessment.policies.length} policies evaluated`);
+    }, "Microsoft 365 collection failed");
+  });
+}
+
+function wireGoogle(): void {
+  view<HTMLButtonElement>("gws-sign-in").addEventListener("click", async () => {
+    try {
+      google ??= new GoogleAuth(config.google.clientId, GOOGLE_SCOPES);
+      await google.signIn();
+      session.update({ signedInAs: google.signedInAs ?? undefined });
+      session.log("info", `Signed in to Google Workspace as ${google.signedInAs}`);
     } catch (error) {
-      fail("Collection failed", error);
-    } finally {
-      button.disabled = false;
+      google = null;
+      fail("Google sign-in failed", error);
     }
   });
+
+  view<HTMLButtonElement>("gws-run").addEventListener("click", async () => {
+    const products = selected<GwsProduct>("gws-products");
+    if (products.length === 0) return note("warn", "Choose at least one Google Workspace product first.");
+    if (!google?.signedInAs) return note("warn", "Sign in to Google Workspace before collecting.");
+
+    await withButton("gws-run", async () => {
+      const assessment = await runGoogleWorkspace({ config, auth: google!, session, products });
+      session.update({ assessment });
+      session.log("info", `Done: ${assessment.policies.length} policies evaluated`);
+    }, "Google Workspace collection failed");
+  });
+}
+
+/** The read-only scopes the Google collectors need, as one consent request. */
+const GOOGLE_SCOPES = [
+  "https://www.googleapis.com/auth/admin.reports.audit.readonly",
+  "https://www.googleapis.com/auth/admin.directory.domain.readonly",
+  "https://www.googleapis.com/auth/admin.directory.orgunit.readonly",
+  "https://www.googleapis.com/auth/admin.directory.user.readonly",
+  "https://www.googleapis.com/auth/admin.directory.rolemanagement.readonly",
+  "https://www.googleapis.com/auth/admin.directory.group.readonly",
+  "https://www.googleapis.com/auth/admin.directory.customer.readonly",
+  "https://www.googleapis.com/auth/cloud-identity.policies.readonly",
+  "https://www.googleapis.com/auth/cloud-identity.inboundsso.readonly",
+].join(" ");
+
+async function withButton(id: string, work: () => Promise<void>, context: string): Promise<void> {
+  const button = view<HTMLButtonElement>(id);
+  button.disabled = true;
+  try {
+    await work();
+  } catch (error) {
+    fail(context, error);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function wireSettingsUpload(): void {
@@ -129,8 +195,9 @@ function wireWipe(): void {
       return;
     }
     session.wipe();
-    await auth?.signOut();
-    auth = null;
+    await Promise.all([microsoft?.signOut(), google?.signOut()]);
+    microsoft = null;
+    google = null;
     // A reload drops every object the page built, including anything a
     // dependency kept a reference to.
     window.location.reload();

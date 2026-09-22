@@ -82,3 +82,93 @@ test("says so when the file is not a settings export", async ({ page }) => {
   });
   await expect(page.locator("#log")).toContainText("does not look like a ScubaGear or ScubaGoggles settings export");
 });
+
+/**
+ * A ScubaGoggles-shaped settings export, built from the reduced policies in
+ * ScubaGoggles' own fixture. It exercises the Google side of the pipeline end
+ * to end: suite detection, the policy-id version suffixes, evaluation of all
+ * eleven Google baselines, and the report.
+ */
+function googleSettings(): Buffer {
+  const fixture = JSON.parse(
+    readFileSync(join(root, "vendor/scubagoggles/scubagoggles/Testing/Unit/Python/data/policyapi_get_policies1.json"), "utf8"),
+  ) as { results: Record<string, Record<string, unknown>> };
+
+  const logs = Object.fromEntries(
+    ["assuredcontrols", "chat", "commoncontrols", "drive", "gemini", "gmail", "meet"].map((product) => [
+      `${product}_logs`,
+      { items: [] },
+    ]),
+  );
+
+  return Buffer.from(
+    JSON.stringify({
+      tenant_info: { ID: "C0123abc", domain: "example.gov", topLevelOU: "topOU" },
+      policies: fixture.results,
+      organizational_units: { organizationUnits: [] },
+      organizational_unit_names: ["", "topOU"],
+      ...logs,
+      domains: ["example.gov"],
+      alias_domains: [],
+      spf_records: [],
+      dkim_records: [],
+      dmarc_records: [],
+      super_admins: [],
+      privileged_users: [],
+      privileged_users_error: null,
+      inbound_sso_assignments: [],
+      inbound_sso_assignments_error: null,
+      break_glass_accounts: [],
+      successful_calls: [],
+      unsuccessful_calls: [],
+    }),
+    "utf8",
+  );
+}
+
+test("evaluates a Google Workspace export and names the policies correctly", async ({ page }) => {
+  const outbound: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).host !== "127.0.0.1:4178") outbound.push(request.url());
+  });
+
+  await page.goto("/");
+  await page.setInputFiles("#settings-file", {
+    name: "ScubaGogglesExport.json",
+    mimeType: "application/json",
+    buffer: googleSettings(),
+  });
+
+  await expect(page.getByRole("heading", { name: "Assessment: topOU" })).toBeVisible();
+  await expect(page.locator(".product-table tbody tr")).toHaveCount(11);
+
+  // Without the version suffixes from the baseline, every Google policy id
+  // comes back as "...vM" and matches nothing in the baseline text.
+  const firstPolicy = page.locator(".policy code").first();
+  await expect(firstPolicy).toHaveText(/^GWS\.[A-Z]+\.\d+\.\d+v\d+$/);
+  await expect(page.locator(".policy .policy-name").first()).not.toBeEmpty();
+
+  expect(outbound).toEqual([]);
+});
+
+test("offers the Google sign-in path", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Sign in with Google" })).toBeVisible();
+  // With no client id configured the app says so rather than failing on click.
+  await expect(page.locator("#log")).toContainText("No Google client id is configured");
+});
+
+test("shows requirement text without its Markdown markers", async ({ page }) => {
+  await page.goto("/");
+  await page.setInputFiles("#settings-file", {
+    name: "ScubaGogglesExport.json",
+    mimeType: "application/json",
+    buffer: googleSettings(),
+  });
+  await expect(page.getByRole("heading", { name: "Assessment: topOU" })).toBeVisible();
+
+  // GWS.COMMONCONTROLS.6.2v1 reads "A minimum of **two** ..." upstream.
+  const names = await page.locator(".policy .policy-name").allInnerTexts();
+  expect(names.join(" ")).not.toContain("**");
+  expect(names.some((name) => name.includes("A minimum of two"))).toBe(true);
+});

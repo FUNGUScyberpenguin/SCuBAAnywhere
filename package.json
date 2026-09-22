@@ -16,13 +16,14 @@
     "vendor": "node tools/vendor-upstream.mjs",
     "policies": "node tools/build-policies.mjs",
     "baselines": "node tools/build-baselines.mjs",
-    "setup": "npm run vendor && npm run policies && npm run baselines",
+    "setup": "npm run vendor && npm run policies && npm run baselines && npm run gws-tables",
     "build": "npm run build -w @scubaanywhere/core && npm run build -w @scubaanywhere/relay && npm run build -w @scubaanywhere/web",
     "test": "npm run test -w @scubaanywhere/core && npm run test -w @scubaanywhere/relay",
     "e2e": "npm run e2e -w @scubaanywhere/web",
     "verify-parity": "node tools/verify-parity.mjs",
     "dev": "npm run dev -w @scubaanywhere/web",
-    "relay": "npm run start -w @scubaanywhere/relay"
+    "relay": "npm run start -w @scubaanywhere/relay",
+    "gws-tables": "node tools/build-gws-tables.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

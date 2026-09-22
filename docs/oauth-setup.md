@@ -84,6 +84,76 @@ The file holds no secrets and is served as a static asset.
 
 ## Google Workspace
 
-Live collection for Google Workspace is not implemented yet, so there is nothing to register. The
-page will evaluate a ScubaGoggles settings export today. See `docs/feasibility.md` for what live
-collection needs.
+Google needs a project with the APIs enabled and an OAuth client. Unlike ScubaGoggles, there is no
+credentials file to download and no service account: the browser gets a one-hour access token and no
+refresh token.
+
+### Enable the APIs
+
+In the Google Cloud console, on the project you want to use, enable:
+
+- Admin SDK API
+- Cloud Identity API
+
+### Create the OAuth client
+
+Under **APIs & Services → Credentials**, create an **OAuth client ID** of type **Web application**.
+
+- **Authorized JavaScript origins**: the origin the page is served from, for example
+  `https://scuba.example.gov`, or `http://localhost:5173` for development.
+- **Authorized redirect URIs**: the same URL including the trailing slash, e.g.
+  `https://scuba.example.gov/`. The sign-in popup returns here.
+
+There is no client secret to configure. If the console gives you one, you do not need it.
+
+On the **OAuth consent screen**, set the user type to **Internal** so only your own organisation can
+consent, and add the scopes below. An external consent screen would need Google verification for
+these scopes and would let accounts outside your tenant attempt sign-in.
+
+### Scopes
+
+All read-only, and the same set ScubaGoggles requests
+(`scubagoggles/scuba_constants.py`):
+
+| Scope | Why |
+| --- | --- |
+| `admin.directory.orgunit.readonly` | Org unit names and paths |
+| `admin.directory.group.readonly` | Group names, and a user's memberships |
+| `admin.directory.user.readonly` | Super admins and delegated admins |
+| `admin.directory.rolemanagement.readonly` | Admin roles and who holds them |
+| `admin.directory.domain.readonly` | Domains, for the SPF, DKIM and DMARC checks |
+| `admin.directory.customer.readonly` | The tenant's canonical customer id |
+| `admin.reports.audit.readonly` | Settings only visible as admin log events |
+| `cloud-identity.policies.readonly` | Nearly every setting the baselines read |
+| `cloud-identity.inboundsso.readonly` | Which SSO profile applies to which users |
+
+ScubaGoggles also asks for `apps.groups.settings` and `apps.licensing`. SCuBAAnywhere does not: no
+Rego policy reads either one.
+
+### Roles
+
+Sign in with a Google Workspace **super administrator**, or an admin with the Services, Groups and
+User Management privileges. The Policy API returns only what the signed-in admin may read, so a
+narrower account produces a thinner assessment rather than an error.
+
+### Configure the page
+
+Add the client id to `web/public/config.json`:
+
+```json
+"google": {
+  "clientId": "000000000000-xxxxxxxxxxxx.apps.googleusercontent.com",
+  "customerId": "my_customer"
+}
+```
+
+`my_customer` means the signed-in admin's own tenant, which is almost always what you want. A
+reseller managing another tenant puts that tenant's customer id here instead.
+
+### A note on the sign-in flow
+
+SCuBAAnywhere calls Google's authorization endpoint directly rather than loading Google Identity
+Services. The flow underneath is the same one GIS's token client uses; skipping the library keeps
+`script-src 'self'` in the page's Content Security Policy, which is part of what stops collected
+configuration going anywhere it should not. The token's audience is checked against your client id
+before it is used, and it is revoked at Google when you wipe the session.

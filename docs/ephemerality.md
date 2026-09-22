@@ -21,13 +21,16 @@ are empty after a full assessment and that a write attempt is refused.
 **Evaluation is local.** The Rego runs in the tab, as WebAssembly. Your configuration is not sent
 somewhere to be assessed.
 
+**No third-party script runs in the page.** `script-src 'self'` holds, which is why Google sign-in
+talks to the authorization endpoint directly instead of loading Google Identity Services.
+
 **Files are written only when you ask.** HTML, JSON and CSV exports are built in the page and handed
 to the browser as a download you started. Where that file goes afterwards is your decision, which is
 the intended division of responsibility.
 
-**Wiping means wiping.** **Wipe session** drops the in-memory state, signs out at the identity
-provider so the next click does not silently sign back in, and reloads the page, which discards every
-object the page built.
+**Wiping means wiping.** **Wipe session** drops the in-memory state, signs out at Microsoft and
+revokes the Google access token so neither can be used again, and reloads the page, which discards
+every object the page built.
 
 **A tenant's data cannot be sent elsewhere.** The page ships a Content Security Policy whose
 `connect-src` lists the Microsoft endpoints, the login host and your relay, and nothing else. Injected
@@ -47,6 +50,7 @@ it off leaves those policies reported as not evaluated rather than silently pass
 
 **The relay sees the data in flight.** It holds nothing, but your configuration and your bearer
 tokens pass through that process. Run it yourself, in your own boundary. Do not use someone else's.
+A Google Workspace assessment does not use it at all, and neither does an Entra-only one.
 
 **The exported file is yours to look after.** A saved HTML report contains the same findings a
 ScubaGear report does. The tool's retention guarantee ends the moment you click save.

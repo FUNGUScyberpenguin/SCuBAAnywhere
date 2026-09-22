@@ -19,3 +19,4 @@ tools/bin/
 web/test-results/
 web/playwright-report/
 web/public/baselines/
+web/public/gws/

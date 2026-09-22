@@ -23,6 +23,20 @@ export function clear(node: Element): void {
   while (node.firstChild) node.firstChild.remove();
 }
 
+/**
+ * CISA writes the baselines in Markdown, so a requirement can arrive as
+ * `A minimum of **two** ... SHALL be configured.` Only the emphasis markers get
+ * in the way on one line of a table, so they are dropped and the rest is left
+ * alone rather than half-rendered.
+ */
+export function plainText(markdown: string): string {
+  return markdown
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/\\([-_*>])/g, "$1")
+    .trim();
+}
+
 /** Escape for the standalone HTML export, which is built as a string. */
 export function escapeHtml(value: unknown): string {
   return String(value)

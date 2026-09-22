@@ -14,6 +14,11 @@ export interface AppConfig {
     authority: string;
     environment: M365Environment;
   };
+  google: {
+    clientId: string;
+    /** `my_customer` is the signed-in admin's own tenant. */
+    customerId: string;
+  };
   /** Relay base URL. Empty means only Entra ID can be assessed live. */
   relayUrl: string;
   dns: {
@@ -25,6 +30,7 @@ export interface AppConfig {
 
 const FALLBACK: AppConfig = {
   microsoft: { clientId: "", authority: "https://login.microsoftonline.com/organizations", environment: "commercial" },
+  google: { clientId: "", customerId: "my_customer" },
   relayUrl: "",
   dns: { enabled: false, resolverUrl: "https://cloudflare-dns.com/dns-query" },
 };
@@ -46,6 +52,7 @@ export async function loadConfig(): Promise<AppConfig> {
     const loaded = (await response.json()) as Partial<AppConfig>;
     return {
       microsoft: { ...FALLBACK.microsoft, ...loaded.microsoft },
+      google: { ...FALLBACK.google, ...loaded.google },
       relayUrl: loaded.relayUrl ?? FALLBACK.relayUrl,
       dns: { ...FALLBACK.dns, ...loaded.dns },
     };

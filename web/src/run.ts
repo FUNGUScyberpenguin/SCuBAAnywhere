@@ -1,11 +1,12 @@
 import {
-  ApiClient, GraphClient, PolicyEngine, SUITES, assembleAssessment, collectM365, detectSuite,
-  productsPresent, readTenantDetails,
-  type Assessment, type BaselineDocument, type DnsOptions, type M365Product,
-  type ProductEvaluation, type ProviderExport, type SuiteId,
+  ApiClient, GraphClient, PolicyEngine, SUITES, assembleAssessment, collectGoogleWorkspace,
+  collectM365, detectSuite, productsPresent, readTenantDetails,
+  type Assessment, type BaselineDocument, type DnsOptions, type GwsProduct, type M365Product,
+  type PolicyTables, type ProductEvaluation, type ProductId, type ProviderExport, type SuiteId,
 } from "@scubaanywhere/core";
 import type { AppConfig } from "./config.js";
 import type { MicrosoftAuth } from "./auth/microsoft.js";
+import type { GoogleAuth } from "./auth/google.js";
 import type { Session } from "./session.js";
 
 export const TOOL_VERSION = "0.1.0";
@@ -49,7 +50,13 @@ function engineFor(suite: SuiteId): Promise<PolicyEngine> {
  */
 export async function evaluateSettings(
   settings: ProviderExport,
-  options: { suite?: SuiteId; failedCollectors?: Record<string, string[]>; startedAt?: string },
+  options: {
+    suite?: SuiteId;
+    /** Limit evaluation to these products; otherwise everything the export covers. */
+    products?: ProductId[];
+    failedCollectors?: Record<string, string[]>;
+    startedAt?: string;
+  },
 ): Promise<Assessment> {
   const suite = options.suite ?? detectSuite(settings);
   if (!suite) {
@@ -63,7 +70,7 @@ export async function evaluateSettings(
   const input = withBaselineVersions(settings, baseline);
 
   const evaluations: ProductEvaluation[] = [];
-  for (const product of productsPresent(suite, settings)) {
+  for (const product of options.products ?? productsPresent(suite, settings)) {
     const failedCollectors = options.failedCollectors?.[product] ?? [];
     try {
       evaluations.push({ product, results: engine.evaluate(product, input), failedCollectors });
@@ -129,6 +136,81 @@ function targetOf(settings: ProviderExport): Assessment["target"] {
     return target;
   }
   return { id: "unknown", displayName: "Unknown organisation" };
+}
+
+/**
+ * Google Workspace policy reduction is table-driven, and the tables come from
+ * ScubaGoggles' source at the pinned commit. See tools/build-gws-tables.mjs.
+ */
+let policyTables: Promise<PolicyTables> | undefined;
+
+function googleTables(): Promise<PolicyTables> {
+  policyTables ??= fetch("gws/tables.json", { cache: "force-cache" }).then(async (response) => {
+    if (!response.ok) {
+      policyTables = undefined;
+      throw new Error("Google policy tables are missing. Run `npm run vendor && npm run gws-tables` before building.");
+    }
+    return (await response.json()) as PolicyTables;
+  });
+  return policyTables;
+}
+
+export interface GoogleRunOptions {
+  config: AppConfig;
+  auth: GoogleAuth;
+  session: Session;
+  products: GwsProduct[];
+  signal?: AbortSignal;
+}
+
+/**
+ * Collect from a live Google Workspace organisation, then evaluate it.
+ *
+ * Google's APIs accept browser origins, so unlike the Microsoft side every call
+ * here goes straight from the page. No relay sits on the path.
+ */
+export async function runGoogleWorkspace(options: GoogleRunOptions): Promise<Assessment> {
+  const { config, auth, session } = options;
+  const startedAt = new Date().toISOString();
+
+  const api = new ApiClient({
+    getToken: () => auth.getToken(),
+    ...(options.signal ? { signal: options.signal } : {}),
+  });
+  session.log("info", "Loading the Google Workspace policy tables");
+  const tables = await googleTables();
+
+  const dns: DnsOptions | undefined = config.dns.enabled
+    ? { resolverUrl: config.dns.resolverUrl, ...(options.signal ? { signal: options.signal } : {}) }
+    : undefined;
+  if (!dns) session.log("warn", "DNS checks are off, so the SPF, DKIM and DMARC policies will not be evaluated");
+
+  const collection = await collectGoogleWorkspace({
+    api,
+    customerId: config.google.customerId,
+    products: options.products,
+    tables,
+    ...(dns ? { dns } : {}),
+    onProgress: (step) => session.log("info", `Google Workspace: ${step}`),
+  });
+
+  for (const [call, message] of Object.entries(collection.failures)) {
+    session.log("warn", `${call} did not return: ${message}`);
+  }
+
+  session.update({
+    settings: collection.export,
+    tenant: { id: collection.organisation.id, displayName: collection.organisation.displayName },
+  });
+  session.log("info", "Evaluating the baselines in this browser");
+  return evaluateSettings(collection.export, {
+    suite: "gws",
+    // A product the operator did not select has no audit log events collected
+    // for it, and the Rego cannot tell that from a setting never being changed.
+    products: options.products,
+    failedCollectors: collection.failedCollectors,
+    startedAt,
+  });
 }
 
 export interface LiveRunOptions {
