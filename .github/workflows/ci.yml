@@ -1,8 +1,9 @@
 name: CI
 
+# Pushing to a branch with an open pull request would otherwise run this twice.
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
 
 permissions:
