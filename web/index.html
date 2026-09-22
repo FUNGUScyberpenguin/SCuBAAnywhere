@@ -5,11 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>SCuBAAnywhere</title>
     <!--
-      Serve the same policy as a response header in production; a meta tag cannot
-      express frame-ancestors. connect-src is the load-bearing line: it is what
-      stops collected configuration being sent anywhere other than the admin APIs
-      it came from. Add your relay's origin to it when you deploy one, and your
-      DNS-over-HTTPS resolver if you turn the DNS checks on.
+      connect-src is the load-bearing line: it is what stops collected
+      configuration being sent anywhere other than the admin APIs it came from.
+      A relay origin, or a DNS-over-HTTPS resolver if the DNS checks are on, is
+      added at build time from SCUBA_CONNECT_SRC.
+
+      A meta tag cannot express frame-ancestors, and a static host such as
+      GitHub Pages cannot set response headers either, so main.ts refuses to run
+      in a frame. Where you can set headers, send this policy as one and add
+      frame-ancestors 'none'.
 
       There is no third-party script here, which is why Google sign-in talks to
       the authorization endpoint directly rather than loading Google Identity
@@ -26,7 +30,7 @@
                  https://graph.microsoft.com https://graph.microsoft.us https://dod-graph.microsoft.us
                  https://login.microsoftonline.com https://login.microsoftonline.us
                  https://admin.googleapis.com https://cloudidentity.googleapis.com
-                 https://oauth2.googleapis.com;
+                 https://oauth2.googleapis.com%SCUBA_EXTRA_CONNECT_SRC%;
                form-action 'none';
                base-uri 'none';
                object-src 'none'"

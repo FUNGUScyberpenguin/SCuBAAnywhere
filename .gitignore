@@ -17,6 +17,10 @@ tools/bin/
 
 # Playwright
 web/test-results/
+web/test-results-pages/
 web/playwright-report/
+web/playwright-report-pages/
+web/dist-pages/
+web/public/config.json
 web/public/baselines/
 web/public/gws/

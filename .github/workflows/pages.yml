@@ -1,0 +1,86 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time, and never cancel one that is part-way through
+# replacing the live site.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Fetches CISA's sources at the commits pinned in tools/upstream.json,
+      # downloads a checksum-verified OPA binary, compiles the Rego to
+      # WebAssembly and normalises the baseline text.
+      - name: Fetch upstream and build the policy bundles
+        run: npm run setup
+
+      # Every value here is public: both OAuth clients are public clients with
+      # no secret. Repository *variables*, not secrets, so they are visible and
+      # editable without a commit. With none set the site still deploys, with
+      # live collection off and the settings-export reader working.
+      - name: Write the deployment config
+        id: config
+        env:
+          SCUBA_MS_CLIENT_ID: ${{ vars.SCUBA_MS_CLIENT_ID }}
+          SCUBA_MS_AUTHORITY: ${{ vars.SCUBA_MS_AUTHORITY }}
+          SCUBA_M365_ENVIRONMENT: ${{ vars.SCUBA_M365_ENVIRONMENT }}
+          SCUBA_GOOGLE_CLIENT_ID: ${{ vars.SCUBA_GOOGLE_CLIENT_ID }}
+          SCUBA_GOOGLE_CUSTOMER_ID: ${{ vars.SCUBA_GOOGLE_CUSTOMER_ID }}
+          SCUBA_RELAY_URL: ${{ vars.SCUBA_RELAY_URL }}
+          SCUBA_DNS_ENABLED: ${{ vars.SCUBA_DNS_ENABLED }}
+          SCUBA_DNS_RESOLVER: ${{ vars.SCUBA_DNS_RESOLVER }}
+        run: node tools/write-config.mjs
+
+      # A project repository is served from /<repo>/; a <user>.github.io
+      # repository is served from the root.
+      - name: Work out the base path
+        id: base
+        run: |
+          repo='${{ github.event.repository.name }}'
+          if [[ "$repo" == *.github.io ]]; then
+            echo "path=/" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=/$repo/" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build the site
+        env:
+          SCUBA_BASE_PATH: ${{ steps.base.outputs.path }}
+          # Baked into the page's Content-Security-Policy. A relay or a
+          # DNS-over-HTTPS resolver cannot be added at runtime, which is the
+          # point of putting the policy in the document.
+          SCUBA_CONNECT_SRC: ${{ steps.config.outputs.connect-src }}
+        run: npm run build -w @scubaanywhere/web
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

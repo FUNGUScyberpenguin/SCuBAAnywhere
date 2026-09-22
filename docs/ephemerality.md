@@ -33,9 +33,16 @@ revokes the Google access token so neither can be used again, and reloads the pa
 every object the page built.
 
 **A tenant's data cannot be sent elsewhere.** The page ships a Content Security Policy whose
-`connect-src` lists the Microsoft endpoints, the login host and your relay, and nothing else. Injected
-script cannot exfiltrate what it cannot connect to. One end-to-end test evaluates a full settings
-export and asserts that no request left the page at all.
+`connect-src` lists the Microsoft endpoints, the login host, Google's APIs and your relay, and
+nothing else. Injected script cannot exfiltrate what it cannot connect to. The relay origin is baked
+in when the site is built, so the list cannot be widened at runtime. Two end-to-end tests evaluate a
+full settings export and assert that no request left the page at all, one against a root build and
+one against a build served from a subpath.
+
+**The page refuses to run in a frame.** Framed, it could be dressed up by whatever embedded it while
+the operator signs in to their tenant through someone else's chrome. `frame-ancestors` is the right
+way to stop that, and where you can set response headers you should; a static host cannot, so the
+app checks `window.self === window.top` on startup and replaces itself with a notice instead.
 
 ## Where the claim stops
 
@@ -66,6 +73,8 @@ publisher.
 
 ## Deploying so the claim holds
 
+On a host you control:
+
 - Serve over HTTPS with `Cache-Control: no-store` so intermediaries keep no copy of the page.
 - Send the Content Security Policy as a response header, not only the `<meta>` tag, so it can include
   `frame-ancestors 'none'`. Add your relay's origin to `connect-src`.
@@ -74,3 +83,16 @@ publisher.
 - Do not put an access log with query strings in front of the relay. The target URL is a query
   parameter, and it names tenant hosts.
 - Register the Entra app with read-only delegated permissions. See `docs/oauth-setup.md`.
+
+On GitHub Pages, where response headers are not yours to set:
+
+- The meta Content-Security-Policy still applies and is still enforced. It cannot carry
+  `frame-ancestors`, so the startup frame check stands in for it.
+- `Cache-Control: no-store` is not available. The page is static and holds no tenant data, so there
+  is nothing in it worth withholding from a cache.
+- `https://<user>.github.io` is one origin shared by every project page that user publishes. This
+  app keeps tokens in memory and refuses Web Storage writes; another app of yours on that origin is
+  under no such restraint, and a Google OAuth client authorised for the origin covers all of them.
+  A custom domain gives the app an origin to itself.
+
+See `docs/deploy-github-pages.md`.

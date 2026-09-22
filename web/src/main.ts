@@ -23,6 +23,7 @@ async function main(): Promise<void> {
   // and has one job: hand the token back and close.
   if (completeGoogleRedirect()) return;
 
+  if (refuseToRunInAFrame()) return;
   blockPersistentStorage();
   warnBeforeLosingData(session);
   config = await loadConfig();
@@ -236,6 +237,34 @@ function renderLog(state: Session["current"]): void {
     );
   }
   log.scrollTop = log.scrollHeight;
+}
+
+/**
+ * A framed copy of this page could be dressed up by whatever embedded it, and
+ * the operator would be signing in to Microsoft or Google through someone
+ * else's chrome. `frame-ancestors` is the right way to stop that, but a meta
+ * Content-Security-Policy cannot express it and a static host cannot set the
+ * header, so the page refuses to run instead.
+ *
+ * Returns true when the page is framed and has been stopped.
+ */
+function refuseToRunInAFrame(): boolean {
+  if (window.self === window.top) return false;
+
+  document.body.replaceChildren(
+    el(
+      "main",
+      { class: "card" },
+      el("h2", {}, "SCuBAAnywhere will not run in a frame"),
+      el(
+        "p",
+        {},
+        "This page signs you in to your tenant, so it only runs as the top-level page where you can " +
+          "see the address bar. Open it directly.",
+      ),
+    ),
+  );
+  return true;
 }
 
 function note(level: "info" | "warn", message: string): void {

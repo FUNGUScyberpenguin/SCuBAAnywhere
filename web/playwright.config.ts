@@ -11,7 +11,9 @@ export default defineConfig({
   // nothing to collect on the one failure it was there for.
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL: "http://127.0.0.1:4178",
+    // Trailing slash: the specs navigate with "./" so the same suite runs
+    // against a root build and a GitHub Pages build under /<repo>/.
+    baseURL: "http://127.0.0.1:4178/",
     trace: "retain-on-failure",
     // Honour a Chromium that is already on the machine (CI images often pin one
     // that does not match this Playwright release) and fall back to Playwright's
