@@ -75,6 +75,18 @@ With no configuration the page still evaluates a settings export you already hav
 tenant, register an Entra application and write a `web/public/config.json`; see
 [docs/oauth-setup.md](docs/oauth-setup.md).
 
+## Putting it somewhere
+
+`.github/workflows/pages.yml` builds and publishes to GitHub Pages on every push to `main`. Turn it
+on with Settings → Pages → Source: **GitHub Actions**, set the client ids as repository variables,
+and register the deployed URL as a redirect URI with both providers.
+
+Pages hosts the page but not the relay, so a Pages deployment collects Entra ID and all of Google
+Workspace live, and reports the other five Microsoft products as not evaluated until you point
+`SCUBA_RELAY_URL` at a relay hosted elsewhere. It also cannot set response headers, which costs a
+few defences that the app compensates for in weaker ways.
+[Deploying to GitHub Pages](docs/deploy-github-pages.md) has the detail and the trade-offs.
+
 ## The relay
 
 Microsoft Graph sends the CORS headers a browser app needs. The Exchange Online, Security and
@@ -103,6 +115,7 @@ you do not need to deploy anything beyond the static page. See [docs/relay.md](d
 - [OAuth setup](docs/oauth-setup.md) — the Entra application registration and its permissions.
 - [Feasibility per product](docs/feasibility.md) — which APIs, which need the relay, what is ported.
 - [Relay](docs/relay.md) — deploying and pinning it down.
+- [Deploying to GitHub Pages](docs/deploy-github-pages.md) — the workflow, the variables, what a static host costs.
 
 ## Licensing
 

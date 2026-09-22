@@ -23,7 +23,9 @@
     "verify-parity": "node tools/verify-parity.mjs",
     "dev": "npm run dev -w @scubaanywhere/web",
     "relay": "npm run start -w @scubaanywhere/relay",
-    "gws-tables": "node tools/build-gws-tables.mjs"
+    "gws-tables": "node tools/build-gws-tables.mjs",
+    "config": "node tools/write-config.mjs",
+    "e2e:pages": "npm run e2e:pages -w @scubaanywhere/web"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

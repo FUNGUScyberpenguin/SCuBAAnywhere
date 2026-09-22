@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const sampleExport = join(
@@ -10,16 +10,29 @@ const sampleExport = join(
 );
 
 /** CISA's own sample export, minus the byte order mark their file carries. */
-const sample = () => Buffer.from(readFileSync(sampleExport, "utf8").replace(/^﻿/, ""), "utf8");
+const sample = () => Buffer.from(readFileSync(sampleExport, "utf8").replace(/^\uFEFF/, ""), "utf8");
 
-test("evaluates a settings export in the browser and renders a report", async ({ page }) => {
+/**
+ * The app's own URL, relative to the configured baseURL. It is "./" rather than
+ * "/" so the same specs run against a root build and against a GitHub Pages
+ * build served from /<repo>/.
+ */
+const APP = "./";
+
+/** Every request that leaves the page's own origin and path prefix. */
+function watchOutboundRequests(page: Page, baseURL: string): string[] {
   const outbound: string[] = [];
   page.on("request", (request) => {
-    const url = new URL(request.url());
-    if (url.host !== "127.0.0.1:4178") outbound.push(request.url());
+    if (!request.url().startsWith(baseURL)) outbound.push(request.url());
   });
+  return outbound;
+}
 
-  await page.goto("/");
+
+test("evaluates a settings export in the browser and renders a report", async ({ page, baseURL }) => {
+  const outbound = watchOutboundRequests(page, baseURL!);
+
+  await page.goto(APP);
   await page.setInputFiles("#settings-file", { name: "ProviderSettingsExport.json", mimeType: "application/json", buffer: sample() });
 
   // The tenant name comes out of the export, not from anything typed in.
@@ -37,7 +50,7 @@ test("evaluates a settings export in the browser and renders a report", async ({
 });
 
 test("keeps the settings export out of browser storage", async ({ page }) => {
-  await page.goto("/");
+  await page.goto(APP);
   await page.setInputFiles("#settings-file", { name: "export.json", mimeType: "application/json", buffer: sample() });
   await expect(page.getByRole("heading", { name: /^Assessment:/ })).toBeVisible();
 
@@ -62,7 +75,7 @@ test("keeps the settings export out of browser storage", async ({ page }) => {
 });
 
 test("wiping the session leaves nothing behind", async ({ page }) => {
-  await page.goto("/");
+  await page.goto(APP);
   await page.setInputFiles("#settings-file", { name: "export.json", mimeType: "application/json", buffer: sample() });
   await expect(page.getByRole("heading", { name: /^Assessment:/ })).toBeVisible();
 
@@ -74,7 +87,7 @@ test("wiping the session leaves nothing behind", async ({ page }) => {
 });
 
 test("says so when the file is not a settings export", async ({ page }) => {
-  await page.goto("/");
+  await page.goto(APP);
   await page.setInputFiles("#settings-file", {
     name: "notes.json",
     mimeType: "application/json",
@@ -126,13 +139,10 @@ function googleSettings(): Buffer {
   );
 }
 
-test("evaluates a Google Workspace export and names the policies correctly", async ({ page }) => {
-  const outbound: string[] = [];
-  page.on("request", (request) => {
-    if (new URL(request.url()).host !== "127.0.0.1:4178") outbound.push(request.url());
-  });
+test("evaluates a Google Workspace export and names the policies correctly", async ({ page, baseURL }) => {
+  const outbound = watchOutboundRequests(page, baseURL!);
 
-  await page.goto("/");
+  await page.goto(APP);
   await page.setInputFiles("#settings-file", {
     name: "ScubaGogglesExport.json",
     mimeType: "application/json",
@@ -152,14 +162,14 @@ test("evaluates a Google Workspace export and names the policies correctly", asy
 });
 
 test("offers the Google sign-in path", async ({ page }) => {
-  await page.goto("/");
+  await page.goto(APP);
   await expect(page.getByRole("button", { name: "Sign in with Google" })).toBeVisible();
   // With no client id configured the app says so rather than failing on click.
   await expect(page.locator("#log")).toContainText("No Google client id is configured");
 });
 
 test("shows requirement text without its Markdown markers", async ({ page }) => {
-  await page.goto("/");
+  await page.goto(APP);
   await page.setInputFiles("#settings-file", {
     name: "ScubaGogglesExport.json",
     mimeType: "application/json",
