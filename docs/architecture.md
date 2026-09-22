@@ -77,6 +77,32 @@ This is also how unimplemented collectors stay honest. Power BI collection is no
 Power BI collector marks itself skipped and its policies come back as not evaluated rather than as
 passes.
 
+## Google Workspace takes a different shape
+
+The Microsoft side is many endpoints with a thin translation on top. The Google side is almost one
+endpoint with a thick one.
+
+`cloudidentity.googleapis.com/v1/policies` returns every policy setting in the tenant, but it returns
+them raw: one entry per setting per target, with several entries often applying to the same org unit.
+Turning that into the map the Rego reads is what `scubagoggles/policy_api.py` spends 1,200 lines on,
+and `packages/core/src/collectors/google/policy-api.ts` follows it step for step: sort by Google's
+sort order, reduce duplicates with one of three reducers, fill in documented defaults, read a missing
+service status as disabled, then hand three sections to custom parsers.
+
+Two decisions kept that port honest.
+
+The tables it is driven by are extracted, not copied. `tools/build-gws-tables.mjs` reads
+`_expectedPolicySettings`, `_defaults` and the system-rule defaults out of ScubaGoggles' Python
+source at the pinned commit, using a small reader for the literal syntax those tables actually use.
+A hand-maintained copy would drift the first time the pin moved, and nothing would notice.
+
+The reduction is tested against ScubaGoggles' own fixtures rather than against itself. Those ten
+files pin down the cases upstream thought worth pinning down, and they exercise every reducer, the
+defaults, the org unit and group naming, and all three parsers.
+
+None of this needs a relay: Google's APIs accept browser origins, so a Google Workspace assessment
+runs entirely in the tab.
+
 ## The relay
 
 Microsoft Graph sends `Access-Control-Allow-Origin` and can be called from a page. The Exchange
@@ -98,6 +124,10 @@ path of your tenant's configuration even though it keeps none of it. And the col
 second implementation of ScubaGear's providers, which will drift unless the pin in
 `tools/upstream.json` is bumped deliberately and the parity check re-run.
 
-You get back: no PowerShell, no Python, no OPA install, no elevated workstation, nothing written to
-disk by default, and a report that a reviewer can open on a machine that is not theirs without
-leaving a copy behind.
+The Google side costs less: no relay, and a reduction that is verified against upstream's own
+fixtures rather than reimplemented blind. It still has to track upstream, which is the same standing
+obligation.
+
+You get back: no PowerShell, no Python, no OPA install, no credentials file, no elevated
+workstation, nothing written to disk by default, and a report that a reviewer can open on a machine
+that is not theirs without leaving a copy behind.

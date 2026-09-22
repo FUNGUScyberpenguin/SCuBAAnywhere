@@ -1,5 +1,5 @@
 import { PRODUCT_LABELS, actionPlan, totals, type AssessedPolicy, type Assessment } from "@scubaanywhere/core";
-import { clear, el } from "./dom.js";
+import { clear, el, plainText } from "./dom.js";
 import { download, reportFilename, toCsv, toHtml, toJson } from "./export.js";
 
 const VERDICT_LABELS: Record<AssessedPolicy["verdict"], string> = {
@@ -100,7 +100,7 @@ function policyRow(policy: AssessedPolicy): HTMLElement {
     {},
     el("span", { class: `verdict v-${policy.verdict}` }, VERDICT_LABELS[policy.verdict]),
     el("code", {}, policy.id),
-    el("span", { class: "policy-name" }, policy.baseline?.name ?? ""),
+    el("span", { class: "policy-name" }, plainText(policy.baseline?.name ?? "")),
   );
 
   const body = el("div", { class: "policy-body" });
@@ -108,7 +108,7 @@ function policyRow(policy: AssessedPolicy): HTMLElement {
   body.append(el("p", {}, policy.details.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()));
 
   if (policy.baseline?.rationale) {
-    body.append(el("h4", {}, "Why"), el("p", {}, policy.baseline.rationale));
+    body.append(el("h4", {}, "Why"), el("p", {}, plainText(policy.baseline.rationale)));
   }
   if (policy.verdict !== "pass" && policy.baseline?.implementation) {
     body.append(el("h4", {}, "How to fix"), el("pre", {}, policy.baseline.implementation));

@@ -17,15 +17,27 @@ WebAssembly and runs it unchanged.
 
 ## Does it give the same answers?
 
-Yes, for Microsoft 365, and this is checked rather than asserted. `npm run verify-parity` evaluates
-CISA's own sample settings export twice: once with the OPA binary the way ScubaGear does it, once
-with the WebAssembly bundle the way the browser does it, and diffs every policy result across all
-eight products. They match.
+This is checked rather than asserted, and both halves are checked differently because upstream gives
+you different things to check against.
+
+**Microsoft 365.** `npm run verify-parity` evaluates CISA's own sample settings export twice: once
+with the OPA binary the way ScubaGear does it, once with the WebAssembly bundle the way the browser
+does it, and diffs every policy result across all eight products. They match.
 
 One nuance shows up in that diff. Several baselines build their `ActualValue` from a Rego set, and a
 set has no order. The OPA binary lists the members sorted; the WebAssembly runtime lists them in its
 own order. Same members, same verdict, different order in the text. The parity check reports these
 separately instead of hiding them.
+
+**Google Workspace.** Almost everything a Google baseline reads comes from one map that ScubaGoggles
+builds by reducing Google's raw Policy API output, and getting that reduction wrong produces a
+confident wrong verdict rather than an error. ScubaGoggles pins the reduction down with its own unit
+fixtures, so this port runs against those same fixtures: ten files covering the merge, max-map and
+list reducers, applied defaults, sub-org-unit and group naming, and the Gmail, DLP and system-rule
+parsers. All ten reproduce byte for byte.
+
+The tables that drive the reduction are not transcribed either. `tools/build-gws-tables.mjs` reads
+them out of ScubaGoggles' Python source at the pinned commit.
 
 ## What works today
 
@@ -33,17 +45,17 @@ separately instead of hiding them.
 Graph. Exchange Online, the Security Suite, SharePoint, Teams and Power Platform are collected
 through the relay (see below). Power BI is not collected yet.
 
-**Both suites, offline evaluation.** Point the page at a `ProviderSettingsExport.json` from ScubaGear
-or the equivalent from ScubaGoggles and it evaluates and renders it. All 8 Microsoft products and all
-11 Google Workspace products run. The file is read in the page with `FileReader` and is not uploaded.
+**Google Workspace, live collection.** All eleven baselines, straight from the browser. Google's
+Admin SDK and Cloud Identity APIs accept browser origins, so there is no relay on the path at all and
+the configuration never reaches another machine.
 
-**Google Workspace, live collection.** Not yet. See [docs/feasibility.md](docs/feasibility.md) for
-what that needs, which is a port of ScubaGoggles' Policy API reduction rather than anything
-architectural.
+**Both suites, offline evaluation.** Point the page at a `ProviderSettingsExport.json` from ScubaGear
+or the equivalent from ScubaGoggles and it evaluates and renders it. The file is read in the page
+with `FileReader` and is not uploaded.
 
 A policy whose data never arrived is reported as **not evaluated**, naming the collector that failed.
-It is never reported as a pass. That is the mechanism ScubaGear uses, and it is what makes a partial
-collection safe to read.
+It is never reported as a pass. That is the mechanism both CISA tools use, and it is what makes a
+partial collection safe to read.
 
 ## Quick start
 
@@ -55,8 +67,9 @@ npm run dev       # http://localhost:5173
 ```
 
 `npm run setup` clones the two CISA repositories at the commits pinned in `tools/upstream.json`,
-downloads a checksum-verified OPA binary, and compiles the Rego to WebAssembly. Nothing it produces
-is committed: upstream stays the source of truth.
+downloads a checksum-verified OPA binary, compiles the Rego to WebAssembly, normalises the baseline
+text, and extracts the Google policy tables from ScubaGoggles' source. Nothing it produces is
+committed: upstream stays the source of truth.
 
 With no configuration the page still evaluates a settings export you already have. To assess a live
 tenant, register an Entra application and write a `web/public/config.json`; see
@@ -70,8 +83,8 @@ directly. `relay/` is a small stateless forwarder for exactly those hosts: it ch
 against an allowlist, passes the request on with your own bearer token, returns the response, and
 keeps nothing. It has no database, writes no files, and logs only the method, host, path and status.
 
-Entra ID needs no relay. If you only want the Entra baseline, you do not need to deploy anything
-beyond the static page. See [docs/relay.md](docs/relay.md).
+Entra ID needs no relay, and neither does any part of Google Workspace. If those are all you want,
+you do not need to deploy anything beyond the static page. See [docs/relay.md](docs/relay.md).
 
 ## Layout
 
@@ -80,7 +93,7 @@ beyond the static page. See [docs/relay.md](docs/relay.md).
 | `packages/core` | Collectors, the WebAssembly policy engine, report assembly. No DOM. |
 | `web` | The page: OAuth, the run, the report, the exports. |
 | `relay` | Stateless forwarder for the admin APIs that refuse browser origins. |
-| `tools` | Vendoring, policy and baseline builds, the parity check. |
+| `tools` | Vendoring, policy, baseline and Google table builds, the parity check. |
 | `docs` | Architecture, the ephemerality model, OAuth setup, feasibility. |
 
 ## Documentation

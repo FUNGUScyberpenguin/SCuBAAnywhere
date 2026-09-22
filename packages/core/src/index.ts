@@ -6,4 +6,5 @@ export * from "./collectors/http.js";
 export * from "./collectors/tracker.js";
 export * from "./collectors/dns.js";
 export * from "./collectors/m365/index.js";
+export * from "./collectors/google/index.js";
 export * from "./suite.js";

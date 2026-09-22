@@ -46,37 +46,62 @@ as not evaluated.
 
 ## Google Workspace
 
-Better placed than Microsoft, and further from finished.
+Better placed than Microsoft, and it needs no relay.
 
-The APIs are friendlier. `admin.googleapis.com` and `cloudidentity.googleapis.com` both send CORS
-headers, so a browser can call them directly with a Google Identity Services token and no relay is
-needed at all. The scopes ScubaGoggles requests are in `scubagoggles/scuba_constants.py`, and all
-eleven are read-only:
+`admin.googleapis.com` and `cloudidentity.googleapis.com` both send CORS headers, so the browser
+calls them directly. Every scope is read-only:
 
-```
-admin.directory.customer.readonly      admin.directory.domain.readonly
-admin.directory.group.readonly         admin.directory.orgunit.readonly
-admin.directory.rolemanagement.readonly admin.directory.user.readonly
-admin.reports.audit.readonly           cloud-identity.inboundsso.readonly
-cloud-identity.policies.readonly       apps.groups.settings
-apps.licensing
-```
+| API | What it answers |
+| --- | --- |
+| `cloudidentity.googleapis.com/v1/policies` | Nearly every setting the baselines read |
+| `directory/v1/customer/{id}/orgunits` | Org unit names and paths, and the tenant name |
+| `directory/v1/groups` | Group names, and a user's group membership |
+| `directory/v1/users` | Super admins, delegated admins |
+| `directory/v1/customer/{id}/roles`, `roleassignments` | Who holds a highly privileged role |
+| `directory/v1/customer/{id}/domains`, `domainaliases` | Domains, for the DNS checks |
+| `cloudidentity.googleapis.com/v1/inboundSsoAssignments` | Which SSO profile applies to whom |
+| `reports/v1/activity/.../admin` | Settings only visible as admin log events |
 
-The work is in the middle. Counting `input.<key>` across ScubaGoggles' Rego, 135 of the roughly 170
-references are to `input.policies` — a single map of org unit to settings, built by
-`scubagoggles/policy_api.py` from the Cloud Identity Policies API. That file is about 1,200 lines,
-and the reshaping is not incidental: policies are sorted by Google's sort order, reduced per org unit
-and group by one of three reducers (max, merge, list), defaults are applied for settings Google omits,
-and DLP, Gmail and system rules go through custom parsers.
+### The part that took the work
 
-A partial port would not fail safely. The Rego reads `input.policies` directly, so a missing or
-mis-reduced setting produces a confident wrong verdict rather than a "not evaluated". That is why
-there is no half-finished Google collector in this repository: evaluating an export ScubaGoggles
-produced is correct today, and a live collector lands when the reduction is ported and tested against
-ScubaGoggles' own fixtures.
+Counting `input.<key>` across ScubaGoggles' Rego, 135 of the roughly 170 references are to
+`input.policies`: a single map of org unit to settings, built by `scubagoggles/policy_api.py` from
+the raw Policy API output. That file is about 1,200 lines, and the reshaping is not incidental.
+Policies are sorted by Google's sort order; duplicates for one org unit are reduced by one of three
+reducers (max-map, merge, list); Google's documented defaults are filled in for settings it omits;
+a service with no SKU is read as disabled; and the Gmail, DLP and system-rule sections go through
+custom parsers.
 
-All eleven Google Workspace baselines already run in the browser engine. Only the collection is
-missing.
+None of it fails safely if it is slightly wrong. The Rego reads `input.policies` directly, so a
+mis-reduced setting produces a confident wrong verdict rather than a "not evaluated".
+
+So this port is checked two ways:
+
+- The tables that drive the reduction are extracted from ScubaGoggles' Python source at the pinned
+  commit by `tools/build-gws-tables.mjs`, not transcribed. 96 policy sections, 26 defaults, 30
+  system-defined alert rules.
+- The reduction itself runs against ScubaGoggles' own unit fixtures
+  (`scubagoggles/Testing/Unit/Python/data/policyapi_get_policies*.json`). Ten files, covering all
+  three reducers, applied defaults, sub-org-unit and group naming, DLP rules that do and do not meet
+  the baseline, Gmail address-list flattening, domain detection in allow lists, and system-rule
+  completion. All ten reproduce exactly.
+
+### Limits worth knowing
+
+**Some settings are only visible as log events.** Google exposes no API for them, so ScubaGoggles
+reads the admin audit log instead, and this does the same. A setting only produces an event if an
+admin changed it while the retention window still covers it. Where there is no event, the Rego says
+so and recommends a manual check rather than guessing.
+
+**DKIM selectors are guessed.** There is no API for the selectors in use, so `google`, `selector1`
+and `selector2` are tried in that order, the same three ScubaGoggles tries. A tenant using a
+different selector will look as though it has no DKIM record.
+
+**License data is not collected.** ScubaGoggles reads per-user license assignments to put a summary
+on its report's front page. No Rego policy reads it, and enumerating every license assignment is a
+lot of user data to pull for a cosmetic field, so it is left out.
+
+**Group settings are not collected.** ScubaGoggles fetches them; nothing in the Rego reads them.
 
 ## Keeping this honest
 
